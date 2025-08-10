@@ -1,4 +1,19 @@
-import { _decorator, Component, Node, Sprite, SpriteFrame, Color, Vec3, v2, Vec2, math, sp, find, isValid } from "cc";
+import {
+  _decorator,
+  Component,
+  Node,
+  Sprite,
+  SpriteFrame,
+  Color,
+  Vec3,
+  v2,
+  Vec2,
+  math,
+  sp,
+  find,
+  isValid,
+  UITransform,
+} from "cc";
 import { SpawnBlock } from "../SpawnBlock";
 import { StringName } from "./StringName";
 const { ccclass, property } = _decorator;
@@ -28,6 +43,11 @@ export class GameManager extends Component {
 
   private gameStarted: boolean = false;
 
+  private isStartedGame: boolean = false;
+
+  private moveFrequency: number = 1; // Tần suất di chuyển
+  private pastTime: number = 0; // Thời gian đã trôi qua
+
   public getWidth(): number {
     return this.width;
   }
@@ -35,6 +55,9 @@ export class GameManager extends Component {
     return this.height;
   }
 
+  public getCellSize() {
+    return this.cellSize;
+  }
   public setCurrentTetromino(tetromino: Node): void {
     this.currentTetromino = tetromino;
     console.log("Current tetromino set:", tetromino ? tetromino.name : "null");
@@ -60,7 +83,16 @@ export class GameManager extends Component {
     this.initGrid();
   }
 
-  protected start(): void {}
+  protected start(): void {
+    //  this.spawnBlock.spawnBLock();
+  }
+
+  protected update(dt: number): void {
+    if (this.spawnBlock.getIsLoaded() && !this.isStartedGame) {
+      this.spawnBlock.spawnBLock();
+      this.isStartedGame = true;
+    }
+  }
 
   initGrid(): void {
     this.grid = [];
@@ -70,8 +102,10 @@ export class GameManager extends Component {
         // Tạo Node mới
         this.grid[i][j] = new Node(`Cell_${i}_${j}`);
 
+        const sprite = this.grid[i][j].addComponent(Sprite);
+
         // Thêm Sprite component để có thể nhìn thấy
-        // const sprite = this.grid[i][j].addComponent(Sprite);
+        //this.grid[i][j].addComponent(Sprite);
         // if (this.cellSpriteFrame) {
         //   sprite.spriteFrame = this.cellSpriteFrame;
         // } else {
@@ -81,7 +115,7 @@ export class GameManager extends Component {
         // // Đặt kích thước cho sprite
         // this.grid[i][j].getComponent(Sprite).sizeMode = Sprite.SizeMode.CUSTOM;
 
-        //this.grid[i][j].setContentSize(this.cellSize - 2, this.cellSize - 2); // ← DÒNG NÀY BỊ THIẾU
+        this.grid[i][j].getComponent(UITransform).setContentSize(this.cellSize - 2, this.cellSize - 2); // ← DÒNG NÀY BỊ THIẾU
 
         // Đặt vị trí cho Node (căn giữa lưới)
         this.grid[i][j].setPosition(
@@ -107,7 +141,7 @@ export class GameManager extends Component {
       const worldPos = block.worldPosition;
       const localPos = this.node.inverseTransformPoint(new Vec3(), worldPos);
 
-      console.log(`Block ${i} world position: ${worldPos}, local position: ${localPos}`);
+      //console.log(`Block ${i} world position: ${worldPos}, local position: ${localPos}`);
 
       const col = Math.floor((localPos.x + (this.width * this.cellSize) / 2) / this.cellSize);
       const row = Math.floor((-localPos.y + (this.height * this.cellSize) / 2) / this.cellSize);
@@ -130,40 +164,60 @@ export class GameManager extends Component {
       return;
     }
 
-    // Chỉ cần đánh dấu tetromino này là đã "locked"
-    // Không destroy, không di chuyển vị trí
+    for (let i = 0; i < this.currentTetromino.children.length; i++) {
+      const block = this.currentTetromino.children[i];
+      const worldPos = block.worldPosition.clone();
+      const localPos = this.node.inverseTransformPoint(new Vec3(), worldPos);
 
-    // Có thể thêm một property để đánh dấu tetromino đã bị khóa
-    // Ví dụ: thêm một tag hoặc userData
-    this.currentTetromino.userData = { locked: true };
+      //console.log(`Block ${i} world position: ${worldPos}, local position: ${localPos}`);
 
-    console.log("Tetromino locked at position:", this.currentTetromino.position);
-
-    // Reset current tetromino để spawn tetromino mới
+      const col = Math.floor((localPos.x + (this.width * this.cellSize) / 2) / this.cellSize);
+      const row = Math.floor((-localPos.y + (this.height * this.cellSize) / 2) / this.cellSize);
+      if (row >= 0 && row < this.height && col >= 0 && col < this.width) {
+        this.currentTetromino.removeChild(block); // gỡ khỏi tetromino
+        this.grid[row][col].addChild(block); // gắn vào grid
+        block.setWorldPosition(worldPos); // canh giữa cell
+      }
+    }
     this.currentTetromino = null;
-
-    // Spawn tetromino mới (nếu cần)
-    // if (this.spawnBlock) {
-    //   this.spawnBlock.spawnNewTetromino(); // Giả sử bạn có method này
-    // }
   }
-  //Cập nhật hàm moveBlock để kiểm tra tetromino đã bị lock chưa
-  moveBlock(direction: Vec3): void {
+  public hardDrop(): void {
     if (!isValid(this.currentTetromino)) {
       console.warn("No current tetromino to move.");
       return;
     }
 
-    // Kiểm tra xem tetromino đã bị lock chưa
-    if (this.currentTetromino.userData && this.currentTetromino.userData.locked) {
-      console.log("Tetromino is locked, cannot move.");
+  
+    let isDrop= true;
+    while(isDrop)
+    {
+      const originalPosition =this.currentTetromino.position.clone();
+
+      this.currentTetromino.setPosition(originalPosition.clone().add(new Vec3(0, -this.getCellSize(), 0)));
+
+      if (!this.isValidPosition(this.currentTetromino)) {
+        console.log('tettromino thuc hien hop le');
+        this.currentTetromino.setPosition(originalPosition); // Đưa về vị trí cũ
+        this.lockTetromino();
+        this.spawnBlock.spawnBLock(); // Tạo tetromino mới
+        isDrop = false; // Dừng vòng lặp
+      }
+      
+    }
+  }
+  //Cập nhật hàm moveBlock để kiểm tra tetromino đã bị lock chưa
+  public moveBlock(direction: Vec3): void {
+    if (!isValid(this.currentTetromino)) {
+      console.warn("No current tetromino to move.");
       return;
     }
 
     const originalPosition = this.currentTetromino.position.clone();
 
-    // Calculate the potential new position
-    const newPosition = originalPosition.add(direction);
+    // QUAN TRỌNG: Tạo Vec3 mới thay vì sử dụng tham chiếu
+    //const moveDirection = new Vec3(direction.x, direction.y, direction.z);
+    const newPosition = originalPosition.clone().add(direction);
+
     this.currentTetromino.setPosition(newPosition);
 
     // Check if the new position is valid
@@ -173,29 +227,27 @@ export class GameManager extends Component {
       // Đưa về vị trí cũ
       this.currentTetromino.setPosition(originalPosition);
 
-      // Lock tetromino tại vị trí hiện tại
-      this.lockTetromino();
+      if (direction.y < 0) {
+        this.lockTetromino();
+        this.spawnBlock.spawnBLock();
+      }
     }
   }
-  rotateBlock(): void {
+
+  public rotateBlock(): void {
     if (!isValid(this.currentTetromino)) {
       console.warn("No current tetromino to rotate.");
       return;
     }
-    // Lưu góc xoay gốc (đúng tên biến)
-    const originalAngle = this.currentTetromino.angle;
-
-    // Xoay tetromino
-    this.currentTetromino.angle += 90;
 
     // Kiểm tra vị trí sau khi xoay (SỬA LOGIC CHÍNH)
+    this.currentTetromino.angle += 90;
     if (this.isValidPosition(this.currentTetromino)) {
       console.log("Tetromino xoay hop le");
     } else {
       // Reset về góc xoay cũ
-      this.currentTetromino.angle = originalAngle;
+      this.currentTetromino.angle -= 90;
       console.log("Khong the xoay tetromino");
-      // KHÔNG lock khi không xoay được!
     }
   }
 }
