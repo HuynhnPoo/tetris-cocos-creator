@@ -34,9 +34,6 @@ export class SpawnBlock extends Component {
 
       this.blocks = prefabs;
       this.isLoaded=true;
-      this.blocks.forEach((e) => {
-        console.log("hien thi ten cua block",e.name);
-      });
     });
   }
 

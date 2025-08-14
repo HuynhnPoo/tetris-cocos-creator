@@ -6,16 +6,16 @@ const { ccclass, property } = _decorator;
 export class MoveBlock extends Component {
   private pastTime: number = 0;
   private movementFrequency: number = 1;
-  
+
   start() {
     input.on(Input.EventType.KEY_DOWN, this.onKeyDown, this);
   }
 
   protected update(dt: number): void {
-    this.pastTime += dt; 
+    this.pastTime += dt;
     if (this.pastTime >= this.movementFrequency) {
-      this.pastTime = 0; // Reset thời gian đã trôi qua
-        GameManager.getInstance().moveBlock(new Vec3(0,-GameManager.getInstance().getCellSize(), 0)); // Di chuyển xuống dưới
+      this.pastTime = 0;
+      GameManager.getInstance().moveBlock(new Vec3(0, -GameManager.getInstance().getCellSize(), 0)); // Di chuyển xuống dưới
     }
   }
 
@@ -44,6 +44,5 @@ export class MoveBlock extends Component {
 
   onDestroy() {
     input.off(Input.EventType.KEY_DOWN, this.onKeyDown, this);
-    
   }
 }

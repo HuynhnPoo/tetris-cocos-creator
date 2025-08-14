@@ -1,19 +1,4 @@
-import {
-  _decorator,
-  Component,
-  Node,
-  Sprite,
-  SpriteFrame,
-  Color,
-  Vec3,
-  v2,
-  Vec2,
-  math,
-  sp,
-  find,
-  isValid,
-  UITransform,
-} from "cc";
+import { _decorator, Component, Node, Sprite, SpriteFrame, Vec3, find, isValid, UITransform, Color, size } from "cc";
 import { SpawnBlock } from "../SpawnBlock";
 import { StringName } from "./StringName";
 const { ccclass, property } = _decorator;
@@ -44,9 +29,6 @@ export class GameManager extends Component {
   private gameStarted: boolean = false;
 
   private isStartedGame: boolean = false;
-
-  private moveFrequency: number = 1; // Tần suất di chuyển
-  private pastTime: number = 0; // Thời gian đã trôi qua
 
   public getWidth(): number {
     return this.width;
@@ -105,15 +87,15 @@ export class GameManager extends Component {
         const sprite = this.grid[i][j].addComponent(Sprite);
 
         // Thêm Sprite component để có thể nhìn thấy
-        //this.grid[i][j].addComponent(Sprite);
+        // this.grid[i][j].addComponent(Sprite);
         // if (this.cellSpriteFrame) {
         //   sprite.spriteFrame = this.cellSpriteFrame;
         // } else {
         //   sprite.color = new Color(50, 50, 50, 100);
         // }
 
-        // // Đặt kích thước cho sprite
-        // this.grid[i][j].getComponent(Sprite).sizeMode = Sprite.SizeMode.CUSTOM;
+        // Đặt kích thước cho sprite
+        this.grid[i][j].getComponent(Sprite).sizeMode = Sprite.SizeMode.CUSTOM;
 
         this.grid[i][j].getComponent(UITransform).setContentSize(this.cellSize - 2, this.cellSize - 2); // ← DÒNG NÀY BỊ THIẾU
 
@@ -164,21 +146,29 @@ export class GameManager extends Component {
       return;
     }
 
-    for (let i = 0; i < this.currentTetromino.children.length; i++) {
-      const block = this.currentTetromino.children[i];
+    const blocksToLock = [...this.currentTetromino.children];
+
+    for (let i = 0; i < blocksToLock.length; i++) {
+      const block = blocksToLock[i];
+
+      console.log("hien thi ra block", block.name);
+
       const worldPos = block.worldPosition.clone();
       const localPos = this.node.inverseTransformPoint(new Vec3(), worldPos);
-
-      //console.log(`Block ${i} world position: ${worldPos}, local position: ${localPos}`);
 
       const col = Math.floor((localPos.x + (this.width * this.cellSize) / 2) / this.cellSize);
       const row = Math.floor((-localPos.y + (this.height * this.cellSize) / 2) / this.cellSize);
       if (row >= 0 && row < this.height && col >= 0 && col < this.width) {
-        this.currentTetromino.removeChild(block); // gỡ khỏi tetromino
+        block.removeFromParent();
+
         this.grid[row][col].addChild(block); // gắn vào grid
+        //console.log("objetc them con là:", this.grid[row][col].name);
         block.setWorldPosition(worldPos); // canh giữa cell
       }
     }
+    this.checkClearRows();
+
+    // Kiểm tra và xóa hàng đầy
     this.currentTetromino = null;
   }
   public hardDrop(): void {
@@ -187,24 +177,21 @@ export class GameManager extends Component {
       return;
     }
 
-  
-    let isDrop= true;
-    while(isDrop)
-    {
-      const originalPosition =this.currentTetromino.position.clone();
+    let isDrop = true;
+    while (isDrop) {
+      const originalPosition = this.currentTetromino.position.clone();
 
       this.currentTetromino.setPosition(originalPosition.clone().add(new Vec3(0, -this.getCellSize(), 0)));
 
       if (!this.isValidPosition(this.currentTetromino)) {
-        console.log('tettromino thuc hien hop le');
         this.currentTetromino.setPosition(originalPosition); // Đưa về vị trí cũ
         this.lockTetromino();
         this.spawnBlock.spawnBLock(); // Tạo tetromino mới
         isDrop = false; // Dừng vòng lặp
       }
-      
     }
   }
+
   //Cập nhật hàm moveBlock để kiểm tra tetromino đã bị lock chưa
   public moveBlock(direction: Vec3): void {
     if (!isValid(this.currentTetromino)) {
@@ -222,13 +209,14 @@ export class GameManager extends Component {
 
     // Check if the new position is valid
     if (this.isValidPosition(this.currentTetromino)) {
-      console.log("Tetromino di chuyen hop le:", this.currentTetromino.position);
+      // console.log("Tetromino di chuyen hop le:", this.currentTetromino.position);
     } else {
       // Đưa về vị trí cũ
       this.currentTetromino.setPosition(originalPosition);
 
       if (direction.y < 0) {
         this.lockTetromino();
+
         this.spawnBlock.spawnBLock();
       }
     }
@@ -241,13 +229,71 @@ export class GameManager extends Component {
     }
 
     // Kiểm tra vị trí sau khi xoay (SỬA LOGIC CHÍNH)
-    this.currentTetromino.angle += 90;
-    if (this.isValidPosition(this.currentTetromino)) {
-      console.log("Tetromino xoay hop le");
-    } else {
-      // Reset về góc xoay cũ
-      this.currentTetromino.angle -= 90;
-      console.log("Khong the xoay tetromino");
+    this.currentTetromino.angle -= 90;
+    if (!this.isValidPosition(this.currentTetromino)) 
+      this.currentTetromino.angle += 90;
+  }
+
+  public checkClearRows(): void {
+    // CÁCH 1: Đơn giản - kiểm tra từ dưới lên, không thay đổi row trong vòng lặp
+    let row = this.height - 1;
+    let safety = 0; // biến chống vòng lặp vô hạn để debug
+    while (row >= 0) {
+      if (this.isLineFull(row)) {
+        this.clearRow(row);
+        this.shiftRowsDown(row);
+        row--;
+        safety++;
+        if (safety > 20) {
+          // chống loop vô hạn khi debug
+          console.warn("Vòng lặp dừng vì safety limit");
+          break;
+        }
+      } else {
+        // Chỉ giảm row khi hàng không đầy
+        row--;
+      }
     }
   }
+
+  // Sửa tên hàm cho đúng
+  isLineFull(row: number): boolean {
+    if (row < 0 || row >= this.height) {
+      return false;
+    }
+
+    for (let col = 0; col < this.width; col++) {
+      if (this.grid[row][col].children.length === 0) {
+        return false; // Nếu có bất kỳ ô nào trống, hàng không đầy
+      }
+    }
+    return true; // Tất cả ô trong hàng đều có block
+  }
+
+  public clearRow(row: number): void {
+    for (let col = 0; col < this.width; col++) {
+      const block = this.grid[row][col].children[0];
+      if (block) {
+        block.destroy();
+      }
+    }
+  }
+
+  public shiftRowsDown(startRow: number): void {
+    for (let row = startRow-1; row > 0; row--) {
+      for (let col = 0; col < this.width; col++) {
+       const block = this.grid[row][col].children[0];
+      
+       
+       if (block) {
+        block.removeFromParent();
+        console.log("hien thi ra block:", block.name);
+    
+        block.addChild(this.grid[row][col]); // Di chuyển block xuống dưới
+      
+      //  block.setPosition( this.grid[row - 1][col].getPosition().clone()); // Cập nhật vị trí block
+       }
+    }
+  }
+}
 }
