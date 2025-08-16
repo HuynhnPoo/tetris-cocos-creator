@@ -7,15 +7,19 @@ export class SpawnBlock extends Component {
   @property({ type: Prefab })
   private blocks: Prefab[] = [];
 
-  private isLoaded: boolean=false;
+  private isLoaded: boolean = false;
+
   
-  public getIsLoaded():boolean{
+  public getIsLoaded(): boolean {
     return this.isLoaded;
+  }
+
+  public setIsLoaded(isLoaded:boolean): void {
+    this.isLoaded = isLoaded;
   }
   protected onEnable(): void {
     this.LoadBlocks();
   }
-
 
   private LoadBlocks(): void {
     resources.loadDir("/block", Prefab, (err, prefabs) => {
@@ -33,11 +37,9 @@ export class SpawnBlock extends Component {
       console.log("Loaded prefabs:", prefabs.length);
 
       this.blocks = prefabs;
-      this.isLoaded=true;
+      this.isLoaded = true;
     });
   }
-
-  start() {}
 
   update(deltaTime: number) {}
 
@@ -46,11 +48,9 @@ export class SpawnBlock extends Component {
 
     // Add additional validation
     const selectedPrefab = this.blocks[randomIndex];
-    
-    
 
     if (!selectedPrefab) {
-      console.error("Selected prefab is null/undefined at index:", randomIndex,selectedPrefab);
+      console.error("Selected prefab is null/undefined at index:", randomIndex, selectedPrefab);
       return;
     }
 

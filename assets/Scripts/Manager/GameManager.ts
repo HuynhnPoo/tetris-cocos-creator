@@ -1,6 +1,20 @@
-import { _decorator, Component, Node, Sprite, SpriteFrame, Vec3, find, isValid, UITransform, Color, size } from "cc";
+import {
+  _decorator,
+  Component,
+  Node,
+  Sprite,
+  SpriteFrame,
+  Vec3,
+  find,
+  isValid,
+  UITransform,
+  Color,
+  size,
+  director,
+} from "cc";
 import { SpawnBlock } from "../SpawnBlock";
 import { StringName } from "./StringName";
+import { Score } from "./Score";
 const { ccclass, property } = _decorator;
 
 @ccclass("GameManager")
@@ -26,10 +40,9 @@ export class GameManager extends Component {
   private height: number = 20;
   private cellSize: number = 34;
 
-  private gameStarted: boolean = false;
-
   private isStartedGame: boolean = false;
 
+  public score: Score = new Score();
   public getWidth(): number {
     return this.width;
   }
@@ -42,27 +55,26 @@ export class GameManager extends Component {
   }
   public setCurrentTetromino(tetromino: Node): void {
     this.currentTetromino = tetromino;
-    console.log("Current tetromino set:", tetromino ? tetromino.name : "null");
   }
 
   public getCurrentTetromino(): Node {
     return this.currentTetromino;
   }
 
-  public isGameStarted(): boolean {
-    return this.gameStarted;
-  }
-
   protected onEnable(): void {
     if (GameManager.instance !== null && GameManager.instance !== this) {
-      GameManager.instance.destroy();
+      this.node.destroy();
+      return;
     }
     GameManager.instance = this;
+    // Quan trọng: Làm cho Node này bền bỉ giữa các cảnh
 
     if (this.spawnBlock != null) return;
     this.spawnBlock = find(StringName.spawnBlock).getComponent(SpawnBlock);
 
     this.initGrid();
+    this.spawnBlock.setIsLoaded(false);
+    this.isStartedGame = false;
   }
 
   protected start(): void {
@@ -70,6 +82,7 @@ export class GameManager extends Component {
   }
 
   protected update(dt: number): void {
+    console.log("GameManager ", this.spawnBlock.getIsLoaded(), "isStartedGame:", this.isStartedGame);
     if (this.spawnBlock.getIsLoaded() && !this.isStartedGame) {
       this.spawnBlock.spawnBLock();
       this.isStartedGame = true;
@@ -77,6 +90,7 @@ export class GameManager extends Component {
   }
 
   initGrid(): void {
+    
     this.grid = [];
     for (let i = 0; i < this.height; i++) {
       this.grid[i] = [];
@@ -133,7 +147,6 @@ export class GameManager extends Component {
         return false; // Out of bounds
       }
       if (this.grid[row] && this.grid[row][col] && this.grid[row][col].children.length > 0) {
-        console.log(`Block at (${row}, ${col}) overlaps with existing block.`);
         return false; // Overlaps with an existing block
       }
     }
@@ -150,8 +163,6 @@ export class GameManager extends Component {
 
     for (let i = 0; i < blocksToLock.length; i++) {
       const block = blocksToLock[i];
-
-      console.log("hien thi ra block", block.name);
 
       const worldPos = block.worldPosition.clone();
       const localPos = this.node.inverseTransformPoint(new Vec3(), worldPos);
@@ -184,6 +195,7 @@ export class GameManager extends Component {
       this.currentTetromino.setPosition(originalPosition.clone().add(new Vec3(0, -this.getCellSize(), 0)));
 
       if (!this.isValidPosition(this.currentTetromino)) {
+        this.score.addScore(10); // Cộng điểm khi hard drop
         this.currentTetromino.setPosition(originalPosition); // Đưa về vị trí cũ
         this.lockTetromino();
         this.spawnBlock.spawnBLock(); // Tạo tetromino mới
@@ -230,8 +242,7 @@ export class GameManager extends Component {
 
     // Kiểm tra vị trí sau khi xoay (SỬA LOGIC CHÍNH)
     this.currentTetromino.angle -= 90;
-    if (!this.isValidPosition(this.currentTetromino)) 
-      this.currentTetromino.angle += 90;
+    if (!this.isValidPosition(this.currentTetromino)) this.currentTetromino.angle += 90;
   }
 
   public checkClearRows(): void {
@@ -280,20 +291,30 @@ export class GameManager extends Component {
   }
 
   public shiftRowsDown(startRow: number): void {
-    for (let row = startRow-1; row > 0; row--) {
+    for (let row = startRow - 1; row > 0; row--) {
       for (let col = 0; col < this.width; col++) {
-       const block = this.grid[row][col].children[0];
-      
-       
-       if (block) {
-        block.removeFromParent();
-        console.log("hien thi ra block:", block.name);
-    
-        block.addChild(this.grid[row][col]); // Di chuyển block xuống dưới
-      
-      //  block.setPosition( this.grid[row - 1][col].getPosition().clone()); // Cập nhật vị trí block
-       }
+        const block = this.grid[row][col].children[0];
+
+        // console.log('hien thi cha block ', block.parent.name);
+        if (block) {
+          block?.removeFromParent();
+          // console.log("hien thi ra block:", block.name, "cha :", block.parent.name);
+
+          this.grid[row + 1][col].addChild(block);
+          block.setPosition(5, -10, 0);
+        }
+      }
     }
   }
-}
+
+  protected onDestroy(): void {
+    this.spawnBlock.setIsLoaded(false); // Đặt spawnBlock về trạng thái chưa tải
+    this.isStartedGame = false; // Đặt isStartedGame về false khi GameManager bị hủy
+    GameManager.instance = null; // Đặt instance về null khi GameManager bị hủy
+  }
+
+  gameOver(): void {
+    const ss=this.currentTetromino.children[0].position;
+
+  }
 }
