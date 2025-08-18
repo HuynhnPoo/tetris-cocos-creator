@@ -12,7 +12,6 @@ export class Score {
   addScore(score: number): number {
     this.score += score;
 
-    console.log("Score updated:", this.score);
     return this.score;
   }
 }

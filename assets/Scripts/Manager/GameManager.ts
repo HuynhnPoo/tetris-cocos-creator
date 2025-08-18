@@ -82,7 +82,6 @@ export class GameManager extends Component {
   }
 
   protected update(dt: number): void {
-    console.log("GameManager ", this.spawnBlock.getIsLoaded(), "isStartedGame:", this.isStartedGame);
     if (this.spawnBlock.getIsLoaded() && !this.isStartedGame) {
       this.spawnBlock.spawnBLock();
       this.isStartedGame = true;
@@ -90,7 +89,6 @@ export class GameManager extends Component {
   }
 
   initGrid(): void {
-    
     this.grid = [];
     for (let i = 0; i < this.height; i++) {
       this.grid[i] = [];
@@ -169,6 +167,15 @@ export class GameManager extends Component {
 
       const col = Math.floor((localPos.x + (this.width * this.cellSize) / 2) / this.cellSize);
       const row = Math.floor((-localPos.y + (this.height * this.cellSize) / 2) / this.cellSize);
+
+      console.log('Locking block at:', row);
+      if(row==3)  this.scheduleOnce(()=>{
+
+       director.loadScene("GAMEPLAY");
+        this.isStartedGame=false;
+      },0.5);
+
+      
       if (row >= 0 && row < this.height && col >= 0 && col < this.width) {
         block.removeFromParent();
 
@@ -177,6 +184,7 @@ export class GameManager extends Component {
         block.setWorldPosition(worldPos); // canh giữa cell
       }
     }
+   //
     this.checkClearRows();
 
     // Kiểm tra và xóa hàng đầy
@@ -219,6 +227,9 @@ export class GameManager extends Component {
 
     this.currentTetromino.setPosition(newPosition);
 
+    
+
+    console.log("Tetromino di chuyển đến:", this.currentTetromino.position);
     // Check if the new position is valid
     if (this.isValidPosition(this.currentTetromino)) {
       // console.log("Tetromino di chuyen hop le:", this.currentTetromino.position);
@@ -231,6 +242,7 @@ export class GameManager extends Component {
 
         this.spawnBlock.spawnBLock();
       }
+     
     }
   }
 
@@ -312,9 +324,6 @@ export class GameManager extends Component {
     this.isStartedGame = false; // Đặt isStartedGame về false khi GameManager bị hủy
     GameManager.instance = null; // Đặt instance về null khi GameManager bị hủy
   }
+  
 
-  gameOver(): void {
-    const ss=this.currentTetromino.children[0].position;
-
-  }
 }
